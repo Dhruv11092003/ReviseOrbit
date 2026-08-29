@@ -1,0 +1,172 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+/* Make Tailwind's dark: variant follow our manual theme toggle
+   (html[data-theme="dark"]) instead of the OS color-scheme media query. */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
+  --font-body: "Inter", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+/* ---- Theme tokens -------------------------------------------------
+   Everything that changes between light/dark lives here as plain CSS
+   variables. Components just read var(--color-*) / var(--surface-*)
+   so the same JSX works in both themes. Dark is the default (no
+   attribute needed); light kicks in once <html data-theme="light">
+   is set (see ThemeContext). */
+
+:root {
+  --color-bg: #0a0e1a;
+  --color-bg-2: #0f1420;
+  --color-surface: #131a2b;
+  --color-surface-2: #1a2338;
+  --color-border: #232c44;
+
+  --color-violet: #8b6cff;
+  --color-violet-2: #6d4fe0;
+  --color-blue: #4f8dfd;
+  --color-emerald: #34d399;
+  --color-amber: #fbbf5a;
+  --color-red: #f8748a;
+
+  --color-text: #eef1fb;
+  --color-text-dim: #9aa3c0;
+  --color-text-faint: #626c8c;
+
+  --surface-1: rgba(255, 255, 255, 0.05);
+  --surface-2: rgba(255, 255, 255, 0.09);
+  --border-soft: rgba(255, 255, 255, 0.08);
+
+  --glass-bg: linear-gradient(180deg, rgba(26, 35, 56, 0.7), rgba(19, 26, 43, 0.55));
+  --glass-border: rgba(255, 255, 255, 0.06);
+
+  --toast-bg: #131a2b;
+  --toast-text: #eef1fb;
+  --toast-border: #232c44;
+}
+
+html[data-theme="light"] {
+  --color-bg: #f4f5fb;
+  --color-bg-2: #eceef7;
+  --color-surface: #ffffff;
+  --color-surface-2: #f1f2f9;
+  --color-border: #e1e3ef;
+
+  --color-violet: #7c5cff;
+  --color-violet-2: #6544e0;
+  --color-blue: #3f7ce0;
+  --color-emerald: #16a97a;
+  --color-amber: #c9820f;
+  --color-red: #d94f66;
+
+  --color-text: #1a1d2b;
+  --color-text-dim: #565c72;
+  --color-text-faint: #8189a1;
+
+  --surface-1: rgba(23, 26, 46, 0.04);
+  --surface-2: rgba(23, 26, 46, 0.07);
+  --border-soft: rgba(23, 26, 46, 0.09);
+
+  --glass-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.65));
+  --glass-border: rgba(23, 26, 46, 0.07);
+
+  --toast-bg: #ffffff;
+  --toast-text: #1a1d2b;
+  --toast-border: #e1e3ef;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+h1, h2, h3, h4, .font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono-app {
+  font-family: var(--font-mono);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-2);
+  border-radius: 999px;
+  border: 2px solid var(--color-bg);
+}
+
+.glass {
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+}
+
+.gradient-border {
+  position: relative;
+}
+.gradient-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(139,108,255,0.5), rgba(79,141,253,0.15), rgba(139,108,255,0));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, var(--color-violet), var(--color-blue) 60%, var(--color-emerald));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(80px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+html[data-theme="light"] .orb {
+  opacity: 0.16;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+html[data-theme="light"] input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.4);
+}
