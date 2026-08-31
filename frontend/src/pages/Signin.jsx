@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, LogIn, Orbit } from "lucide-react";
@@ -13,9 +13,15 @@ export default function Signin() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const { login } = useAuth();
+  const { login, hasWorkspace, initializing } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  useEffect(() => {
+    if (!initializing && !hasWorkspace) {
+      navigate("/welcome", { replace: true });
+    }
+  }, [initializing, hasWorkspace, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -119,8 +125,13 @@ export default function Signin() {
 
         <p className="text-center text-sm text-[var(--color-text-dim)] mt-5">
           Don't have an account?{" "}
-          <Link to="/signup" className="text-violet-500 hover:text-violet-200 font-medium">
+          <Link to="/signup" className="text-violet-500 hover:text-violet-400 font-medium">
             Create one
+          </Link>
+        </p>
+        <p className="text-center text-xs text-[var(--color-text-faint)] mt-3">
+          <Link to="/welcome" className="hover:text-[var(--color-text-dim)]">
+            Wrong workspace? Connect a different database
           </Link>
         </p>
       </motion.div>

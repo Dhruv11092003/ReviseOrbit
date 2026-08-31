@@ -13,6 +13,7 @@ import {
   Orbit,
   Sun,
   Moon,
+  Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
@@ -24,6 +25,7 @@ const links = [
   { to: "/pending", label: "Pending", icon: ListTodo },
   { to: "/all", label: "All Tasks", icon: ListChecks },
   { to: "/add", label: "Add Revision", icon: PlusCircle },
+  { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];
 
 function ThemeToggle({ className = "" }) {
@@ -45,8 +47,8 @@ export default function Navbar() {
   const { username, logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     toast.success("Signed out");
     navigate("/signin");
   };

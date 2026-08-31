@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, Loader2, UserPlus, Orbit, Check, X as XIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import * as api from "../services/api";
 import { ApiError } from "../services/httpClient";
+import { useAuth } from "../context/AuthContext";
 import BackgroundOrbs from "../components/BackgroundOrbs";
 
 // Mirrors the backend's password policy exactly:
@@ -16,7 +17,7 @@ const rules = [
   { test: (p) => p.length >= 8 && p.length <= 32, label: "8–32 characters" },
   { test: (p) => /[A-Za-z]/.test(p), label: "At least one letter" },
   { test: (p) => /\d/.test(p), label: "At least one number" },
-  { test: (p) => /[!#$%^&*()+=]/.test(p), label: "One special character (!#$%^&*()+=)" },
+  { test: (p) => /[@!#$%^&*()+=]/.test(p), label: "One special character (@!#$%^&*()+=)" },
 ];
 
 export default function Signup() {
@@ -27,7 +28,14 @@ export default function Signup() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const { tenantId, hasWorkspace, initializing } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!initializing && !hasWorkspace) {
+      navigate("/welcome", { replace: true });
+    }
+  }, [initializing, hasWorkspace, navigate]);
 
   const passwordValid = PASSWORD_REGEX.test(password);
 
@@ -51,16 +59,11 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      await api.signup({ name: name.trim(), username: username.trim(), password });
+      await api.signup({ tenantId, name: name.trim(), username: username.trim(), password });
       toast.success("Account created! Please sign in.");
       navigate("/signin");
     } catch (err) {
-      const message =
-        err instanceof ApiError
-          ? err.message
-          : err.isValidation
-          ? err.message
-          : "Something went wrong.";
+      const message = err instanceof ApiError ? err.message : "Something went wrong.";
       setError(message);
       toast.error(message);
     } finally {
@@ -188,7 +191,7 @@ export default function Signup() {
 
         <p className="text-center text-sm text-[var(--color-text-dim)] mt-5">
           Already have an account?{" "}
-          <Link to="/signin" className="text-violet-500 hover:text-violet-200 font-medium">
+          <Link to="/signin" className="text-violet-500 hover:text-violet-400 font-medium">
             Sign in
           </Link>
         </p>

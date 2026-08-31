@@ -1,29 +1,54 @@
-import { http, EDIT_DELETE_ENABLED } from "./httpClient";
+import { http } from "./httpClient";
 
-// ---- Auth --------------------------------------------------------------
+// ---- Tenant / database setup --------------------------------------------
 
-export async function signup({ name, username, password }) {
-  const res = await http.post("/signup", { name, username, password });
-  // Backend sends 201 with plain text "User Created" on success, or 200
-  // with a plain-text password-policy message on validation failure (it
-  // does not use a 4xx status for that case), so we detect it here.
-  if (
-    res.status === 200 &&
-    typeof res.data === "string" &&
-    /password/i.test(res.data)
-  ) {
-    const err = new Error(res.data);
-    err.isValidation = true;
-    throw err;
-  }
+export async function setupTenant({ connectionString, label }) {
+  const res = await http.post("/api/tenant/setup", { connectionString, label });
+  return res.data; // { tenantId }
+}
+
+export async function testDbConnection(connectionString) {
+  const res = await http.post("/api/tenant/db/test", { connectionString });
   return res.data;
 }
 
-export async function signin({ username, password }) {
-  const res = await http.post("/signin", { username, password });
-  // Current backend returns res.status(200).send({username}, "...") — the
-  // second arg to res.send() is ignored by Express, so we only ever get
-  // { username } back. No token is issued by the unpatched backend.
+export async function getDbStatus() {
+  const res = await http.get("/api/tenant/status");
+  return res.data;
+}
+
+export async function reconnectDb(connectionString) {
+  const res = await http.post("/api/tenant/db/reconnect", { connectionString });
+  return res.data;
+}
+
+export async function disconnectDb() {
+  const res = await http.post("/api/tenant/db/disconnect");
+  return res.data;
+}
+
+// ---- Auth ----------------------------------------------------------------
+// tenantId identifies which workspace/database to sign into. It's not a
+// secret — think of it like a workspace slug — so it's fine for the
+// frontend to read/send it plainly.
+
+export async function signup({ tenantId, name, username, password }) {
+  const res = await http.post("/signup", { tenantId, name, username, password });
+  return res.data;
+}
+
+export async function signin({ tenantId, username, password }) {
+  const res = await http.post("/signin", { tenantId, username, password });
+  return res.data;
+}
+
+export async function logout() {
+  const res = await http.post("/logout");
+  return res.data;
+}
+
+export async function whoAmI() {
+  const res = await http.get("/me");
   return res.data;
 }
 
@@ -65,26 +90,13 @@ export async function activateTodayTasks() {
 }
 
 // ---- Edit / Delete ---------------------------------------------------
-// The backend supplied to us does not implement these. They are only
-// wired up (and only rendered in the UI) when VITE_ENABLE_EDIT_DELETE=true,
-// which corresponds to running the patched backend in /backend-patch.
 
 export async function updateRevision(id, payload) {
-  if (!EDIT_DELETE_ENABLED) {
-    throw new Error(
-      "Editing is not available: the connected backend has no /updateEntry endpoint."
-    );
-  }
   const res = await http.put(`/updateEntry/${id}`, payload);
   return res.data;
 }
 
 export async function deleteRevision(id) {
-  if (!EDIT_DELETE_ENABLED) {
-    throw new Error(
-      "Deleting is not available: the connected backend has no /deleteEntry endpoint."
-    );
-  }
   const res = await http.delete(`/deleteEntry/${id}`);
   return res.data;
 }

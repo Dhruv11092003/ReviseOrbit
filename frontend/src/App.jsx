@@ -5,6 +5,9 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
+import Welcome from "./pages/Welcome";
+import DatabaseSetup from "./pages/DatabaseSetup";
+import DatabaseError from "./pages/DatabaseError";
 import Signin from "./pages/Signin";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
@@ -12,6 +15,7 @@ import Today from "./pages/Today";
 import Pending from "./pages/Pending";
 import AddRevision from "./pages/AddRevision";
 import AllTasks from "./pages/AllTasks";
+import Settings from "./pages/Settings";
 
 function PageTransition({ children }) {
   return (
@@ -33,11 +37,51 @@ function RedirectIfAuthed({ children }) {
   return children;
 }
 
+function HomeRedirect() {
+  const { hasWorkspace, isAuthenticated, initializing } = useAuth();
+  if (initializing) return null;
+  if (isAuthenticated) return <Navigate to="/dashboard" replace />;
+  if (hasWorkspace) return <Navigate to="/signin" replace />;
+  return <Navigate to="/welcome" replace />;
+}
+
+function DbUnavailableGate({ children }) {
+  const { dbUnavailable, clearDbUnavailable } = useAuth();
+  if (dbUnavailable) {
+    return (
+      <DatabaseError
+        message={dbUnavailable}
+        onRetry={() => {
+          clearDbUnavailable();
+          window.location.reload();
+        }}
+      />
+    );
+  }
+  return children;
+}
+
 function AnimatedRoutes() {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait">
       <Routes location={location} key={location.pathname}>
+        <Route
+          path="/welcome"
+          element={
+            <PageTransition>
+              <Welcome />
+            </PageTransition>
+          }
+        />
+        <Route
+          path="/setup"
+          element={
+            <PageTransition>
+              <DatabaseSetup />
+            </PageTransition>
+          }
+        />
         <Route
           path="/signin"
           element={
@@ -62,7 +106,9 @@ function AnimatedRoutes() {
         <Route
           element={
             <ProtectedRoute>
-              <AppLayout />
+              <DbUnavailableGate>
+                <AppLayout />
+              </DbUnavailableGate>
             </ProtectedRoute>
           }
         >
@@ -106,10 +152,18 @@ function AnimatedRoutes() {
               </PageTransition>
             }
           />
+          <Route
+            path="/settings"
+            element={
+              <PageTransition>
+                <Settings />
+              </PageTransition>
+            }
+          />
         </Route>
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<HomeRedirect />} />
+        <Route path="*" element={<HomeRedirect />} />
       </Routes>
     </AnimatePresence>
   );

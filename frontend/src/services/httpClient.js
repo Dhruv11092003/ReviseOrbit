@@ -1,26 +1,11 @@
 import axios from "axios";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
-export const JWT_ENABLED = import.meta.env.VITE_ENABLE_JWT === "true";
-export const EDIT_DELETE_ENABLED =
-  import.meta.env.VITE_ENABLE_EDIT_DELETE === "true";
 
 export const http = axios.create({
   baseURL: API_URL,
-  withCredentials: true, // send/receive the HttpOnly auth cookie when JWT mode is on
+  withCredentials: true, // sends/receives the HttpOnly session cookie
   timeout: 15000,
-});
-
-// When JWT mode is off (plain original backend), we still attach the
-// username as a bearer-ish header so a future backend can recognize the
-// caller without us inventing a fake token. It is never treated as a
-// security boundary on the frontend.
-http.interceptors.request.use((config) => {
-  const username = localStorage.getItem("dsa_username");
-  if (username && !JWT_ENABLED) {
-    config.headers["X-Username"] = username;
-  }
-  return config;
 });
 
 export class ApiError extends Error {
@@ -72,11 +57,17 @@ http.interceptors.response.use(
   (error) => {
     const message = extractErrorMessage(error);
     const status = error.response?.status;
+
     if (status === 401) {
-      // Centralized unauthorized handling: notify the app so AuthContext
-      // can clear the session and any protected route redirects to /signin.
+      // Session invalid/expired — clear it and send the person to sign in.
       window.dispatchEvent(new CustomEvent("dsa:unauthorized"));
     }
+    if (status === 403) {
+      // Authenticated, but this workspace's database isn't connected/active
+      // right now — different situation from "not signed in".
+      window.dispatchEvent(new CustomEvent("dsa:db-unavailable", { detail: { message } }));
+    }
+
     return Promise.reject(new ApiError(message, status, error.code));
   }
 );

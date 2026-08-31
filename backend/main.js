@@ -1,364 +1,123 @@
 const express = require("express");
-const mongoose = require("mongoose");
 const dotenv = require("dotenv");
 const cors = require("cors");
+const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
-const jwt = require("jsonwebtoken");
-const user = require("./model/userSchema");
-const revise = require("./model/reviseSchema");
-const bcrypt = require("bcrypt");
 const cron = require("node-cron");
 
 dotenv.config();
-const app = express();
 
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "http://localhost:5173";
-app.use(cors({ origin: CLIENT_ORIGIN, credentials: true }));
-app.use(express.json());
-app.use(cookieParser());
+const { connectCentralDb, getTenantModel, closeCentralDb } = require("./db/central");
+const { closeAllTenantConnections, getTenantModels } = require("./db/tenantManager");
+const { apiLimiter } = require("./middleware/rateLimit");
+const tenantRoutes = require("./routes/tenant");
+const authRoutes = require("./routes/auth");
+const revisionRoutes = require("./routes/revisions");
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  console.error(
-    "JWT_SECRET is not set. Add JWT_SECRET=<a long random string> to your .env before starting this server.",
-  );
+// --- Required config, fail fast and clearly if missing ---------------
+const REQUIRED_ENV = ["CENTRAL_MONGODB_URI", "JWT_SECRET", "ENCRYPTION_KEY", "FRONTEND_URL"];
+const missing = REQUIRED_ENV.filter((k) => !process.env[k]);
+if (missing.length) {
+  console.error(`Missing required environment variables: ${missing.join(", ")}`);
+  console.error("See .env.example for what each one is for.");
   process.exit(1);
 }
-const TOKEN_TTL = "7d";
-const COOKIE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function authMiddleware(req, res, next) {
-  const token = req.cookies?.token;
-  if (!token) {
-    return res.status(401).json({ message: "Not authenticated" });
-  }
+const app = express();
+app.set("trust proxy", 1); // needed for correct client IPs behind a hosting provider's proxy
+
+app.use(helmet());
+app.use(
+  cors({
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
+  })
+);
+app.use(express.json({ limit: "200kb" })); // small ceiling — this app has no file uploads
+app.use(cookieParser());
+app.use(apiLimiter);
+
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+app.use("/api/tenant", tenantRoutes);
+app.use("/", authRoutes); // /signup, /signin, /logout, /me — unchanged paths for the existing frontend
+app.use("/", revisionRoutes); // /newEntry, /fetchToday, /fetchPending, /fetchAll, etc — same paths as before
+
+// Centralized error handler — never leak stack traces or raw driver errors.
+app.use((err, req, res, next) => {
+  console.error(err);
+  if (res.headersSent) return next(err);
+  res.status(err.status || 500).json({ message: "Something went wrong. Please try again." });
+});
+
+// --- Daily activation cron, now run per-active-tenant -----------------
+// Each tenant's data lives in its own database, so "activate today's
+// tasks" has to run once per connected tenant rather than once globally.
+async function runDailyActivationForAllTenants() {
   try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = { username: payload.username };
-    next();
-  } catch {
-    return res
-      .status(401)
-      .json({ message: "Session expired, please sign in again" });
+    const Tenant = getTenantModel();
+    const tenants = await Tenant.find({ accessStatus: "active" }).select("+dbConfigEncrypted");
+
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
+
+    for (const tenant of tenants) {
+      try {
+        const models = await getTenantModels(tenant.tenantId, tenant.dbConfigEncrypted);
+        const result = await models.Revise.updateMany(
+          { nextReviseDate: { $gte: startOfDay, $lte: endOfDay } },
+          { $set: { isPending: true } }
+        );
+        if (result.modifiedCount > 0) {
+          console.log(`[cron] ${tenant.tenantId}: activated ${result.modifiedCount} task(s).`);
+        }
+      } catch (err) {
+        // One tenant's DB being unreachable must never stop the others.
+        console.error(`[cron] Skipped tenant ${tenant.tenantId}: ${err.message}`);
+      }
+    }
+  } catch (err) {
+    console.error("[cron] Daily activation run failed:", err.message);
   }
 }
 
-cron.schedule("0 0 * * *", async () => {
+cron.schedule("0 0 * * *", runDailyActivationForAllTenants);
+
+// --- Startup -----------------------------------------------------------
+const PORT = process.env.PORT || 5000;
+let server;
+
+connectCentralDb()
+  .then(() => {
+    server = app.listen(PORT, () => {
+      console.log(`ReviseOrbit API listening on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to connect to the central database:", err.message);
+    process.exit(1);
+  });
+
+// --- Graceful shutdown ---------------------------------------------------
+async function shutdown(signal) {
+  console.log(`${signal} received, shutting down gracefully...`);
   try {
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const result = await revise.updateMany(
-      { nextReviseDate: { $gte: startOfDay, $lte: endOfDay } },
-      { $set: { isPending: true } },
-    );
-
-    console.log(
-      `Daily revision update completed. ${result.modifiedCount} tasks activated.`,
-    );
-  } catch (error) {
-    console.error("Daily revision update failed:", error);
-  }
-});
-
-const connectDB = async () => {
-  try {
-    await mongoose.connect(`${process.env.MONGODB_URI}`);
-    console.log("Connected to MongoDB");
-  } catch (e) {
-    console.log("Error Connecting to Database", e);
+    if (server) await new Promise((resolve) => server.close(resolve));
+    await closeAllTenantConnections();
+    await closeCentralDb();
+    console.log("Shutdown complete.");
+    process.exit(0);
+  } catch (err) {
+    console.error("Error during shutdown:", err);
     process.exit(1);
   }
-};
-
-app.get("/", (req, res) => {
-  res.send("Hello World");
-});
-
-app.post("/signup", async (req, res) => {
-  const { name, username, password } = req.body;
-  const checkUser = await user.findOne({ username });
-  if (checkUser) {
-    return res.status(409).send("User Already Exists");
-  }
-  const passwordpattern =
-    /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!#$%^&*()+=])[A-Za-z\d!#$%^&*()+=]{8,32}$/;
-  if (!passwordpattern.test(password)) {
-    return res.send(
-      "Password must be between 8 to 32 characters and include alphabets, numbers, and special characters",
-    );
-  }
-  const ecrPassword = await bcrypt.hash(password, 10);
-  const payload = { name: name, username: username, password: ecrPassword };
-  const newUser = new user(payload);
-  await newUser.save();
-
-  res.status(201).send("User Created");
-});
-
-app.post("/signin", async (req, res) => {
-  const { username, password } = req.body;
-  const checkUser = await user.findOne({ username });
-  if (checkUser) {
-    const checkPass = await bcrypt.compare(password, checkUser.password);
-    if (checkPass) {
-      const token = jwt.sign({ username }, JWT_SECRET, {
-        expiresIn: TOKEN_TTL,
-      });
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: COOKIE_MAX_AGE_MS,
-      });
-      return res.status(200).send({ username });
-    } else {
-      return res.status(401).send("Wrong Password");
-    }
-  } else {
-    return res.status(400).send("User Not Found");
-  }
-});
-
-app.post("/logout", (req, res) => {
-  res.clearCookie("token");
-  res.status(200).json({ message: "Logged out" });
-});
-
-app.post("/newEntry", authMiddleware, async (req, res) => {
-  const {
-    topic,
-    qname,
-    qlink,
-    bForce,
-    optApp,
-    timeComp,
-    pattern,
-    currDate,
-    nextDate,
-  } = req.body;
-
-  const payload = {
-    topic: topic,
-    questionName: qname,
-    link: qlink,
-    bruteForce: bForce,
-    optimalApproach: optApp,
-    timeComplexity: timeComp,
-    patternIdentified: pattern,
-    currentDate: currDate,
-    nextReviseDate: nextDate,
-  };
-  const newEntry = new revise(payload);
-  await newEntry.save();
-  return res.status(201).send("New Entry Added");
-});
-
-app.get("/fetchToday", authMiddleware, async (req, res) => {
-  const today = new Date();
-  const startOfDay = new Date(today);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(today);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  const todayWork = await revise.find({
-    nextReviseDate: { $gte: startOfDay, $lte: endOfDay },
-  });
-
-  if (todayWork.length === 0) {
-    return res.status(200).send({ result: "Nothing For Today" });
-  } else {
-    return res.status(200).send({ result: todayWork });
-  }
-});
-
-app.get("/fetchAll", authMiddleware, async (req, res) => {
-  try {
-    const alltasks = await revise.find();
-    if (alltasks.length == 0) {
-      return res.status(200).send({ result: "Nothing to Show" });
-    } else {
-      return res.status(200).send({ result: alltasks });
-    }
-  } catch (e) {
-    return res.status(500).send(e.message);
-  }
-});
-
-app.get("/fetchPending", authMiddleware, async (req, res) => {
-  try {
-    const pending = await revise.find({ isPending: true });
-    if (pending.length === 0) {
-      return res.status(200).send({ result: "Nothing is Pending" });
-    } else {
-      return res.status(200).send({ result: pending });
-    }
-  } catch (e) {
-    return res.status(500).send(e.message);
-  }
-});
-
-app.post("/updateCompletion/:id", authMiddleware, async (req, res) => {
-  try {
-    const id = req.params.id;
-    const { nextDate } = req.body;
-
-    if (!nextDate) {
-      return res.status(400).json({ message: "nextDate is required" });
-    }
-    const nextReviseDate = new Date(nextDate);
-    if (isNaN(nextReviseDate.getTime())) {
-      return res.status(400).json({ message: "Invalid nextDate" });
-    }
-
-    const today = new Date();
-    const updatedWork = await revise.findByIdAndUpdate(
-      id,
-      {
-        $set: { isPending: false, currentDate: today, nextReviseDate: nextReviseDate },
-        $inc: { revisionCount: 1 },
-      },
-      { new: true },
-    );
-
-    if (!updatedWork) {
-      return res.status(404).json({ message: "Revision task not found" });
-    }
-
-    res
-      .status(200)
-      .json({ message: "Task completed successfully", result: updatedWork });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-app.post("/updateTodayAll", authMiddleware, async (req, res) => {
-  const { nextDate } = req.body;
-  try {
-    if (!nextDate) {
-      return res.status(400).json({ message: "nextDate is required" });
-    }
-
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const nextReviseDate = new Date(nextDate);
-    if (isNaN(nextReviseDate.getTime())) {
-      return res.status(400).json({ message: "Invalid nextDate" });
-    }
-
-    const updatedWork = await revise.updateMany(
-      { nextReviseDate: { $gte: startOfDay, $lte: endOfDay } },
-      {
-        $set: {
-          isPending: false,
-          nextReviseDate: nextReviseDate,
-          currentDate: today,
-        },
-        $inc: { revisionCount: 1 },
-      },
-    );
-
-    res.json({
-      message: "Today's work updated successfully",
-      updatedCount: updatedWork.modifiedCount,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-app.post("/activateTodayTasks", authMiddleware, async (req, res) => {
-  try {
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const result = await revise.updateMany(
-      { nextReviseDate: { $gte: startOfDay, $lte: endOfDay } },
-      { $set: { isPending: true } },
-    );
-
-    res.json({
-      message: "Today's tasks activated",
-      updatedCount: result.modifiedCount,
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// ---- New: edit / delete (absent from the original backend) --------------
-
-app.put("/updateEntry/:id", authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const {
-      topic,
-      qname,
-      qlink,
-      bForce,
-      optApp,
-      timeComp,
-      pattern,
-      currDate,
-      nextDate,
-    } = req.body;
-
-    const update = {};
-    if (topic !== undefined) update.topic = topic;
-    if (qname !== undefined) update.questionName = qname;
-    if (qlink !== undefined) update.link = qlink;
-    if (bForce !== undefined) update.bruteForce = bForce;
-    if (optApp !== undefined) update.optimalApproach = optApp;
-    if (timeComp !== undefined) update.timeComplexity = timeComp;
-    if (pattern !== undefined) update.patternIdentified = pattern;
-    if (currDate !== undefined) update.currentDate = currDate;
-    if (nextDate !== undefined) update.nextReviseDate = nextDate;
-
-    const updated = await revise.findByIdAndUpdate(
-      id,
-      { $set: update },
-      { new: true },
-    );
-    if (!updated) {
-      return res.status(404).json({ message: "Revision task not found" });
-    }
-    res.status(200).json({ message: "Entry updated", result: updated });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-app.delete("/deleteEntry/:id", authMiddleware, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const deleted = await revise.findByIdAndDelete(id);
-    if (!deleted) {
-      return res.status(404).json({ message: "Revision task not found" });
-    }
-    res.status(200).json({ message: "Entry deleted" });
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-});
-
-connectDB();
-const PORT = process.env.PORT || 5000;
-
-try {
-  app.listen(PORT, () => {
-    console.log(`Server Started at ${PORT}`);
-  });
-} catch (e) {
-  console.log("Something went Wrong", e);
 }
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
+
+module.exports = app;
