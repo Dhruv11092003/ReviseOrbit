@@ -3,12 +3,11 @@ const dotenv = require("dotenv");
 const cors = require("cors");
 const helmet = require("helmet");
 const cookieParser = require("cookie-parser");
-const cron = require("node-cron");
 
 dotenv.config();
 
-const { connectCentralDb, getTenantModel, closeCentralDb } = require("./db/central");
-const { closeAllTenantConnections, getTenantModels } = require("./db/tenantManager");
+const { connectCentralDb, closeCentralDb } = require("./db/central");
+const { closeAllTenantConnections } = require("./db/tenantManager");
 const { apiLimiter } = require("./middleware/rateLimit");
 const tenantRoutes = require("./routes/tenant");
 const authRoutes = require("./routes/auth");
@@ -52,42 +51,12 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({ message: "Something went wrong. Please try again." });
 });
 
-// --- Daily activation cron, now run per-active-tenant -----------------
-// Each tenant's data lives in its own database, so "activate today's
-// tasks" has to run once per connected tenant rather than once globally.
-async function runDailyActivationForAllTenants() {
-  try {
-    const Tenant = getTenantModel();
-    const tenants = await Tenant.find({ accessStatus: "active" }).select("+dbConfigEncrypted");
-
-    const startOfDay = new Date();
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
-
-    for (const tenant of tenants) {
-      try {
-        const models = await getTenantModels(tenant.tenantId, tenant.dbConfigEncrypted);
-        const result = await models.Revise.updateMany(
-          { nextReviseDate: { $gte: startOfDay, $lte: endOfDay } },
-          { $set: { isPending: true } }
-        );
-        if (result.modifiedCount > 0) {
-          console.log(`[cron] ${tenant.tenantId}: activated ${result.modifiedCount} task(s).`);
-        }
-      } catch (err) {
-        // One tenant's DB being unreachable must never stop the others.
-        console.error(`[cron] Skipped tenant ${tenant.tenantId}: ${err.message}`);
-      }
-    }
-  } catch (err) {
-    console.error("[cron] Daily activation run failed:", err.message);
-  }
-}
-
-cron.schedule("0 0 * * *", runDailyActivationForAllTenants);
-
 // --- Startup -----------------------------------------------------------
+// Today's-tasks activation is no longer a background job here — see
+// services/revisionActivation.js. It runs per-request, scoped to whichever
+// tenant the verified JWT resolves to, right before /fetchToday and
+// /fetchPending answer. No cron, no global tenant scan, no idle background
+// process required to keep revision state correct.
 const PORT = process.env.PORT || 5000;
 let server;
 

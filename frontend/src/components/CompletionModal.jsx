@@ -37,8 +37,11 @@ export default function CompletionModal({ open, onClose, task, existingTasks = [
       {task && (
         <div className="mb-4">
           <p className="text-sm text-[var(--color-text-dim)]">
-            Mark <span className="text-[var(--color-text)] font-medium">{task.questionName}</span> as
-            completed and schedule its next revision.
+            Mark{" "}
+            <span className="text-[var(--color-text)] font-medium">
+              {task.type === "theory" ? task.title : task.questionName}
+            </span>{" "}
+            as completed and schedule its next revision.
           </p>
         </div>
       )}

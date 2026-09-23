@@ -13,6 +13,7 @@ import {
   Orbit,
   Sun,
   Moon,
+  Compass,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -24,6 +25,7 @@ const links = [
   { to: "/today", label: "Today", icon: CalendarClock },
   { to: "/pending", label: "Pending", icon: ListTodo },
   { to: "/all", label: "All Tasks", icon: ListChecks },
+  { to: "/patterns", label: "Patterns", icon: Compass },
   { to: "/add", label: "Add Revision", icon: PlusCircle },
   { to: "/settings", label: "Settings", icon: SettingsIcon },
 ];

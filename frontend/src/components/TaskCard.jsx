@@ -7,8 +7,13 @@ import {
   Tag,
   Clock,
   Sparkles,
+  Pencil,
+  Trash2,
+  Code2,
+  BookOpen,
 } from "lucide-react";
 import { formatDate, isToday, isOverdue } from "../utils/date";
+import { resolvePatternDisplay, getPatternById } from "../data/patterns";
 
 function StatusBadge({ task }) {
   if (!task.isPending) {
@@ -39,8 +44,41 @@ function StatusBadge({ task }) {
   );
 }
 
-export default function TaskCard({ task, onComplete, index = 0 }) {
+function TypeBadge({ type }) {
+  const isTheory = type === "theory";
+  const Icon = isTheory ? BookOpen : Code2;
+  return (
+    <span
+      className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md border ${
+        isTheory
+          ? "bg-blue-500/10 text-blue-400 border-blue-500/25"
+          : "bg-violet-500/10 text-violet-400 border-violet-500/25"
+      }`}
+    >
+      <Icon size={10} /> {isTheory ? "Theory" : "LeetCode"}
+    </span>
+  );
+}
+
+function NoteBlock({ label, value }) {
+  if (!value) return null;
+  return (
+    <div>
+      <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">{label}</p>
+      <p className="text-[var(--color-text-dim)] whitespace-pre-wrap">{value}</p>
+    </div>
+  );
+}
+
+export default function TaskCard({ task, onComplete, onEdit, onDelete, index = 0 }) {
   const [expanded, setExpanded] = useState(false);
+  const isTheory = task.type === "theory";
+  const primaryPattern = resolvePatternDisplay(task);
+  const secondaryPatternNames = (task.secondaryPatterns || [])
+    .map((id) => getPatternById(id)?.name)
+    .filter(Boolean);
+
+  const title = isTheory ? task.title || "Untitled theory" : task.questionName;
 
   return (
     <motion.div
@@ -53,26 +91,30 @@ export default function TaskCard({ task, onComplete, index = 0 }) {
       className="glass gradient-border rounded-2xl p-5 relative overflow-hidden"
     >
       <div className="flex items-start justify-between gap-2 mb-2">
-        <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-violet-500/90">
-          <Tag size={11} /> {task.topic || "General"}
-        </span>
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <TypeBadge type={task.type} />
+          <span className="inline-flex items-center gap-1 text-[11px] font-medium uppercase tracking-wide text-violet-500/90">
+            <Tag size={11} /> {task.topic || "General"}
+          </span>
+        </div>
         <StatusBadge task={task} />
       </div>
 
-      <h3 className="font-display text-base font-semibold leading-snug mb-1 pr-1">
-        {task.questionName}
-      </h3>
+      <h3 className="font-display text-base font-semibold leading-snug mb-1 pr-1">{title}</h3>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-text-dim)] mb-3">
-        {task.timeComplexity && (
+        {!isTheory && task.timeComplexity && task.timeComplexity !== "-" && (
           <span className="font-mono-app flex items-center gap-1">
             <Clock size={12} /> {task.timeComplexity}
           </span>
         )}
-        {task.patternIdentified && (
-          <span className="flex items-center gap-1">
-            <Sparkles size={12} /> {task.patternIdentified}
+        {!isTheory && primaryPattern && (
+          <span className="flex items-center gap-1" title={primaryPattern.legacy ? "From an older free-text pattern" : undefined}>
+            <Sparkles size={12} /> {primaryPattern.name}
           </span>
+        )}
+        {!isTheory && secondaryPatternNames.length > 0 && (
+          <span className="text-[var(--color-text-faint)]">+{secondaryPatternNames.length} more</span>
         )}
       </div>
 
@@ -96,38 +138,35 @@ export default function TaskCard({ task, onComplete, index = 0 }) {
             className="overflow-hidden"
           >
             <div className="pt-2 pb-1 space-y-2.5 text-sm">
-              {task.bruteForce && (
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">
-                    Brute force
-                  </p>
-                  <p className="text-[var(--color-text-dim)]">{task.bruteForce}</p>
-                </div>
+              {isTheory ? (
+                <>
+                  <NoteBlock label="What to revise" value={task.whatToRevise} />
+                  <NoteBlock label="Key concepts" value={task.keyConcepts} />
+                  <NoteBlock label="Short notes" value={task.shortNotes} />
+                  <NoteBlock label="Common mistakes" value={task.commonMistakes} />
+                  <NoteBlock label="Example / use case" value={task.exampleOrUseCase} />
+                </>
+              ) : (
+                <>
+                  <NoteBlock label="Brute force" value={task.bruteForce && task.bruteForce !== "-" ? task.bruteForce : ""} />
+                  <NoteBlock
+                    label="Optimal approach"
+                    value={task.optimalApproach && task.optimalApproach !== "-" ? task.optimalApproach : ""}
+                  />
+                  {secondaryPatternNames.length > 0 && (
+                    <NoteBlock label="Secondary patterns" value={secondaryPatternNames.join(", ")} />
+                  )}
+                </>
               )}
-              {task.optimalApproach && (
-                <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">
-                    Optimal approach
-                  </p>
-                  <p className="text-[var(--color-text-dim)]">{task.optimalApproach}</p>
-                </div>
-              )}
+              <NoteBlock label="Additional notes" value={task.additionalNotes} />
               <div className="flex gap-6 pt-1">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">
-                    Last revised
-                  </p>
-                  <p className="font-mono-app text-xs text-[var(--color-text-dim)]">
-                    {formatDate(task.currentDate)}
-                  </p>
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">Last revised</p>
+                  <p className="font-mono-app text-xs text-[var(--color-text-dim)]">{formatDate(task.currentDate)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">
-                    Next revision
-                  </p>
-                  <p className="font-mono-app text-xs text-[var(--color-text-dim)]">
-                    {formatDate(task.nextReviseDate)}
-                  </p>
+                  <p className="text-[11px] uppercase tracking-wide text-[var(--color-text-faint)] mb-0.5">Next revision</p>
+                  <p className="font-mono-app text-xs text-[var(--color-text-dim)]">{formatDate(task.nextReviseDate)}</p>
                 </div>
               </div>
             </div>
@@ -136,7 +175,7 @@ export default function TaskCard({ task, onComplete, index = 0 }) {
       </AnimatePresence>
 
       <div className="flex items-center gap-2 mt-4 pt-4 border-t border-[var(--border-soft)]">
-        {task.link && (
+        {!isTheory && task.link && task.link !== "-" && (
           <a
             href={task.link}
             target="_blank"
@@ -152,6 +191,26 @@ export default function TaskCard({ task, onComplete, index = 0 }) {
             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-gradient-to-r from-emerald-500/90 to-emerald-400/90 hover:brightness-110 text-emerald-950 transition"
           >
             <CheckCircle2 size={13} /> Complete
+          </button>
+        )}
+        {onEdit && (
+          <button
+            onClick={() => onEdit(task)}
+            aria-label="Edit revision"
+            title="Edit"
+            className="p-2 rounded-lg text-xs font-medium bg-[var(--surface-1)] hover:bg-[var(--surface-2)] text-[var(--color-text-dim)] hover:text-[var(--color-text)] transition-colors border border-[var(--border-soft)]"
+          >
+            <Pencil size={13} />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            onClick={() => onDelete(task)}
+            aria-label="Delete revision"
+            title="Delete"
+            className="p-2 rounded-lg text-xs font-medium bg-[var(--surface-1)] hover:bg-red-500/10 text-[var(--color-text-dim)] hover:text-red-400 transition-colors border border-[var(--border-soft)]"
+          >
+            <Trash2 size={13} />
           </button>
         )}
       </div>
