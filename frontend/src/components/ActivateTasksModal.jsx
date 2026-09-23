@@ -7,8 +7,8 @@ export default function ActivateTasksModal({ open, onClose, onConfirm, loading }
       <div className="flex items-start gap-3 mb-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
         <AlertTriangle size={18} className="text-amber-600 shrink-0 mt-0.5" />
         <p className="text-sm text-amber-700 dark:text-amber-200">
-          Normally these tasks are activated automatically at the start of a new day.
-          Use this only if the automatic activation did not run.
+          Due tasks are activated automatically every time this app loads your data —
+          there's no daily job to wait on. This button just forces an immediate re-check.
         </p>
       </div>
 

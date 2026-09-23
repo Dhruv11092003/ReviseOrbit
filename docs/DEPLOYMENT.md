@@ -61,6 +61,42 @@ env vars) are the same shape on any of them.
 9. Custom domain: optional, configure in the host's dashboard the same
    way as the frontend.
 
+## Cloudflare Worker: considered, not implemented
+
+Some Node hosts (Render's free tier, for example) put the backend to
+sleep after a period of inactivity and take several seconds to cold-start
+it on the next request. It's tempting to reach for a Cloudflare Worker as
+a fix. This build deliberately does not add one, for a specific reason:
+
+**A Worker cannot keep a sleeping Node process alive.** Cloudflare Workers
+run on Cloudflare's edge, entirely separate from wherever the Express app
+is hosted. A Worker can proxy requests to the backend or ping a health
+endpoint on a schedule, but neither of those changes what the host does
+with an idle process — the host's own sleep policy decides that, and nothing
+running on Cloudflare's edge has any way to override it. The only things a
+Worker could actually do here are:
+
+- **Proxy traffic** in front of the backend — adds a hop and a second
+  system to deploy, monitor, and keep in sync with CORS/cookie behavior,
+  for no capability this app is missing (the backend already sets
+  `helmet`, CORS, and HttpOnly cookies correctly on its own).
+- **Ping `/health` on a schedule** to keep the process warm — this does
+  work, but it's solving "my host's free tier sleeps" with a second piece
+  of infrastructure, when the actual fix is either accepting the
+  occasional cold start (a personal revision tracker doesn't need
+  five-nines uptime) or paying for a host tier that doesn't sleep. Adding
+  a Worker to work around a hosting choice is exactly the kind of
+  unnecessary infrastructure this project is trying to avoid.
+
+If cold starts genuinely become a problem, the direct fix is a host
+setting (an "always on" tier) or a plain external uptime-monitor ping
+(UptimeRobot, cron-job.org) hitting `/health` — neither requires writing
+or maintaining any Cloudflare Worker code. The request-time revision
+activation redesign (`docs/ARCHITECTURE.md`) also makes cold starts less
+risky than before: there's no scheduled job that could silently fail to
+run while the process is asleep — activation happens on whatever the next
+request is, whenever it arrives.
+
 ## Post-deploy checklist
 
 - [ ] Visit `/health` on the deployed backend — should return `200`.

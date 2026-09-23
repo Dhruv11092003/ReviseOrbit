@@ -5,6 +5,14 @@ provides the software and each customer owns their own MongoDB
 database.** Application data — accounts, revisions, tasks — lives in the
 customer's own MongoDB, never in a central database ReviseOrbit controls.
 
+Tracks two kinds of revisions — **LeetCode questions** (with a canonical
+pattern selector, brute-force/optimal notes, complexity) and **Theory**
+topics (what to revise, key concepts, common mistakes) — with full
+edit/delete, manual date correction, and a **Patterns** reference page
+built from the DSA Handbook's pattern-recognition guide. Due/overdue
+revisions activate automatically on request — see "Revision activation"
+in `docs/ARCHITECTURE.md` — there's no daily cron job to wait on.
+
 ## Quick start (local development)
 
 ### 1. Your own central database (metadata only)

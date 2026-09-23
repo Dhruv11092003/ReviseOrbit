@@ -10,6 +10,9 @@ import {
   Zap,
   Sparkles,
   ListChecks,
+  Code2,
+  BookOpen,
+  Clock3,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as api from "../services/api";
@@ -21,7 +24,10 @@ import { TaskListSkeleton, StatCardSkeleton } from "../components/LoadingSkeleto
 import CompletionModal from "../components/CompletionModal";
 import CompleteAllModal from "../components/CompleteAllModal";
 import ActivateTasksModal from "../components/ActivateTasksModal";
+import EditRevisionModal from "../components/EditRevisionModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
 import { isOverdue } from "../utils/date";
+import { getPatternById } from "../data/patterns";
 
 export default function Dashboard() {
   const { username } = useAuth();
@@ -32,6 +38,8 @@ export default function Dashboard() {
   const [completingTask, setCompletingTask] = useState(null);
   const [completeAllOpen, setCompleteAllOpen] = useState(false);
   const [activateOpen, setActivateOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [deletingTask, setDeletingTask] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -99,10 +107,48 @@ export default function Dashboard() {
     }
   };
 
-  const todayCount = today.length;
+  const handleSaveEdit = async (id, payload) => {
+    setActionLoading(true);
+    try {
+      await api.updateRevision(id, payload);
+      toast.success("Revision updated.");
+      await load();
+      return true;
+    } catch (err) {
+      toast.error(err.message || "Failed to update revision.");
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTask) return;
+    setActionLoading(true);
+    try {
+      await api.deleteRevision(deletingTask._id);
+      toast.success("Revision deleted.");
+      setDeletingTask(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete revision.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const pendingCount = pending.length;
   const overdueCount = pending.filter((t) => isOverdue(t.nextReviseDate)).length;
   const todayPending = today.filter((t) => t.isPending);
+  const leetcodeCount = allTasks.filter((t) => t.type !== "theory").length;
+  const theoryCount = allTasks.filter((t) => t.type === "theory").length;
+  const upcomingCount = allTasks.filter((t) => t.isPending && !isOverdue(t.nextReviseDate) && !today.some((d) => d._id === t._id)).length;
+  const completedCount = allTasks.filter((t) => !t.isPending).length;
+  const patternsUsedCount = new Set(
+    allTasks
+      .flatMap((t) => [t.primaryPattern, ...(t.secondaryPatterns || [])])
+      .filter((id) => id && getPatternById(id))
+  ).size;
 
   const now = new Date();
   const dateLabel = now.toLocaleDateString(undefined, {
@@ -136,22 +182,20 @@ export default function Dashboard() {
 
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          {Array.from({ length: 4 }).map((_, i) => (
+          {Array.from({ length: 8 }).map((_, i) => (
             <StatCardSkeleton key={i} />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
-          <StatCard icon={CalendarClock} label="Due today" value={todayCount} accent="violet" delay={0} />
-          <StatCard icon={ListTodo} label="Pending" value={pendingCount} accent="amber" delay={0.05} />
-          <StatCard icon={TrendingUp} label="Overdue" value={overdueCount} accent="blue" delay={0.1} />
-          <StatCard
-            icon={CheckCircle2}
-            label="Completed today"
-            value={todayCount - todayPending.length}
-            accent="emerald"
-            delay={0.15}
-          />
+          <StatCard icon={CalendarClock} label="Due today" value={todayPending.length} accent="violet" delay={0} />
+          <StatCard icon={TrendingUp} label="Overdue" value={overdueCount} accent="blue" delay={0.05} />
+          <StatCard icon={ListTodo} label="Pending" value={pendingCount} accent="amber" delay={0.1} />
+          <StatCard icon={CheckCircle2} label="Completed" value={completedCount} accent="emerald" delay={0.15} />
+          <StatCard icon={Code2} label="LeetCode questions" value={leetcodeCount} accent="violet" delay={0.2} />
+          <StatCard icon={BookOpen} label="Theory topics" value={theoryCount} accent="blue" delay={0.25} />
+          <StatCard icon={Clock3} label="Upcoming" value={upcomingCount} accent="amber" delay={0.3} />
+          <StatCard icon={Sparkles} label="Patterns used" value={patternsUsedCount} accent="emerald" delay={0.35} />
         </div>
       )}
 
@@ -195,7 +239,14 @@ export default function Dashboard() {
         <div className="grid gap-4 sm:grid-cols-2">
           <AnimatePresence>
             {today.slice(0, 4).map((task, i) => (
-              <TaskCard key={task._id} task={task} index={i} onComplete={setCompletingTask} />
+              <TaskCard
+                key={task._id}
+                task={task}
+                index={i}
+                onComplete={setCompletingTask}
+                onEdit={setEditingTask}
+                onDelete={setDeletingTask}
+              />
             ))}
           </AnimatePresence>
         </div>
@@ -207,6 +258,21 @@ export default function Dashboard() {
         task={completingTask}
         existingTasks={allTasks}
         onConfirm={handleComplete}
+        loading={actionLoading}
+      />
+      <EditRevisionModal
+        open={Boolean(editingTask)}
+        onClose={() => setEditingTask(null)}
+        task={editingTask}
+        existingTasks={allTasks}
+        onSave={handleSaveEdit}
+        submitting={actionLoading}
+      />
+      <DeleteConfirmModal
+        open={Boolean(deletingTask)}
+        onClose={() => setDeletingTask(null)}
+        task={deletingTask}
+        onConfirm={handleConfirmDelete}
         loading={actionLoading}
       />
       <CompleteAllModal

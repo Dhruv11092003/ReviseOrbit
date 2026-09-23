@@ -15,6 +15,7 @@ import Today from "./pages/Today";
 import Pending from "./pages/Pending";
 import AddRevision from "./pages/AddRevision";
 import AllTasks from "./pages/AllTasks";
+import Patterns from "./pages/Patterns";
 import Settings from "./pages/Settings";
 
 function PageTransition({ children }) {
@@ -149,6 +150,14 @@ function AnimatedRoutes() {
             element={
               <PageTransition>
                 <AllTasks />
+              </PageTransition>
+            }
+          />
+          <Route
+            path="/patterns"
+            element={
+              <PageTransition>
+                <Patterns />
               </PageTransition>
             }
           />

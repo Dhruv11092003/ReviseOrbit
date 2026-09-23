@@ -8,6 +8,9 @@ import EmptyState from "../components/EmptyState";
 import { TaskListSkeleton } from "../components/LoadingSkeleton";
 import CompletionModal from "../components/CompletionModal";
 import CompleteAllModal from "../components/CompleteAllModal";
+import EditRevisionModal from "../components/EditRevisionModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
+import { isOverdue } from "../utils/date";
 
 export default function Today() {
   const [tasks, setTasks] = useState([]);
@@ -15,6 +18,8 @@ export default function Today() {
   const [loading, setLoading] = useState(true);
   const [completingTask, setCompletingTask] = useState(null);
   const [completeAllOpen, setCompleteAllOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
+  const [deletingTask, setDeletingTask] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -63,7 +68,39 @@ export default function Today() {
     }
   };
 
+  const handleSaveEdit = async (id, payload) => {
+    setActionLoading(true);
+    try {
+      await api.updateRevision(id, payload);
+      toast.success("Revision updated.");
+      await load();
+      return true;
+    } catch (err) {
+      toast.error(err.message || "Failed to update revision.");
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTask) return;
+    setActionLoading(true);
+    try {
+      await api.deleteRevision(deletingTask._id);
+      toast.success("Revision deleted.");
+      setDeletingTask(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete revision.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const pendingToday = tasks.filter((t) => t.isPending);
+  const overdueTasks = pendingToday.filter((t) => isOverdue(t.nextReviseDate));
+  const dueTodayTasks = pendingToday.filter((t) => !isOverdue(t.nextReviseDate));
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -77,7 +114,8 @@ export default function Today() {
             <CalendarClock size={24} className="text-violet-500" /> Today's Revision
           </h1>
           <p className="text-sm text-[var(--color-text-dim)] mt-1">
-            {tasks.length} task{tasks.length === 1 ? "" : "s"} scheduled for today
+            {pendingToday.length} task{pendingToday.length === 1 ? "" : "s"} due
+            {overdueTasks.length > 0 && ` (${overdueTasks.length} overdue)`}
           </p>
         </div>
         {pendingToday.length > 0 && (
@@ -101,12 +139,45 @@ export default function Today() {
           actionTo="/add"
         />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <AnimatePresence>
-            {tasks.map((task, i) => (
-              <TaskCard key={task._id} task={task} index={i} onComplete={setCompletingTask} />
-            ))}
-          </AnimatePresence>
+        <div className="space-y-8">
+          {overdueTasks.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-red-400 mb-3">Overdue</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <AnimatePresence>
+                  {overdueTasks.map((task, i) => (
+                    <TaskCard
+                      key={task._id}
+                      task={task}
+                      index={i}
+                      onComplete={setCompletingTask}
+                      onEdit={setEditingTask}
+                      onDelete={setDeletingTask}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </section>
+          )}
+          {dueTodayTasks.length > 0 && (
+            <section>
+              <h2 className="text-sm font-semibold text-[var(--color-text-dim)] mb-3">Due Today</h2>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <AnimatePresence>
+                  {dueTodayTasks.map((task, i) => (
+                    <TaskCard
+                      key={task._id}
+                      task={task}
+                      index={i}
+                      onComplete={setCompletingTask}
+                      onEdit={setEditingTask}
+                      onDelete={setDeletingTask}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
+            </section>
+          )}
         </div>
       )}
 
@@ -116,6 +187,21 @@ export default function Today() {
         task={completingTask}
         existingTasks={allTasks}
         onConfirm={handleComplete}
+        loading={actionLoading}
+      />
+      <EditRevisionModal
+        open={Boolean(editingTask)}
+        onClose={() => setEditingTask(null)}
+        task={editingTask}
+        existingTasks={allTasks}
+        onSave={handleSaveEdit}
+        submitting={actionLoading}
+      />
+      <DeleteConfirmModal
+        open={Boolean(deletingTask)}
+        onClose={() => setDeletingTask(null)}
+        task={deletingTask}
+        onConfirm={handleConfirmDelete}
         loading={actionLoading}
       />
       <CompleteAllModal

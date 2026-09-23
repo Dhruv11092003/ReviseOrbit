@@ -7,7 +7,9 @@ import TaskCard from "../components/TaskCard";
 import EmptyState from "../components/EmptyState";
 import { TaskListSkeleton } from "../components/LoadingSkeleton";
 import CompletionModal from "../components/CompletionModal";
-import { toDateStringFromBackend } from "../utils/date";
+import EditRevisionModal from "../components/EditRevisionModal";
+import DeleteConfirmModal from "../components/DeleteConfirmModal";
+import { toDateStringFromBackend, isOverdue } from "../utils/date";
 
 const SORTS = {
   nextDate: (a, b) => toDateStringFromBackend(a.nextReviseDate).localeCompare(toDateStringFromBackend(b.nextReviseDate)),
@@ -20,9 +22,12 @@ export default function Pending() {
   const [allTasks, setAllTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [completingTask, setCompletingTask] = useState(null);
+  const [editingTask, setEditingTask] = useState(null);
+  const [deletingTask, setDeletingTask] = useState(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [sortKey, setSortKey] = useState("nextDate");
   const [topicFilter, setTopicFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,6 +61,36 @@ export default function Pending() {
     }
   };
 
+  const handleSaveEdit = async (id, payload) => {
+    setActionLoading(true);
+    try {
+      await api.updateRevision(id, payload);
+      toast.success("Revision updated.");
+      await load();
+      return true;
+    } catch (err) {
+      toast.error(err.message || "Failed to update revision.");
+      return false;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTask) return;
+    setActionLoading(true);
+    try {
+      await api.deleteRevision(deletingTask._id);
+      toast.success("Revision deleted.");
+      setDeletingTask(null);
+      await load();
+    } catch (err) {
+      toast.error(err.message || "Failed to delete revision.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const topics = useMemo(() => {
     const set = new Set(tasks.map((t) => t.topic).filter(Boolean));
     return ["all", ...Array.from(set)];
@@ -64,8 +99,12 @@ export default function Pending() {
   const filtered = useMemo(() => {
     let list = tasks;
     if (topicFilter !== "all") list = list.filter((t) => t.topic === topicFilter);
+    if (statusFilter === "overdue") list = list.filter((t) => isOverdue(t.nextReviseDate));
+    if (statusFilter === "today") list = list.filter((t) => !isOverdue(t.nextReviseDate));
     return [...list].sort(SORTS[sortKey]);
-  }, [tasks, sortKey, topicFilter]);
+  }, [tasks, sortKey, topicFilter, statusFilter]);
+
+  const overdueCount = tasks.filter((t) => isOverdue(t.nextReviseDate)).length;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -80,6 +119,7 @@ export default function Pending() {
           </h1>
           <p className="text-sm text-[var(--color-text-dim)] mt-1">
             {tasks.length} revision{tasks.length === 1 ? "" : "s"} awaiting review
+            {overdueCount > 0 && ` · ${overdueCount} overdue`}
           </p>
         </div>
       </motion.div>
@@ -98,6 +138,15 @@ export default function Pending() {
               <option value="name">Sort: Question name</option>
             </select>
           </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-[var(--surface-1)] border border-[var(--border-soft)] rounded-lg px-2.5 py-1.5 text-xs outline-none focus:border-violet-400/60"
+          >
+            <option value="all">All pending</option>
+            <option value="overdue">Overdue only</option>
+            <option value="today">Due today only</option>
+          </select>
           {topics.length > 1 && (
             <select
               value={topicFilter}
@@ -122,16 +171,40 @@ export default function Pending() {
           title="You're all caught up"
           subtitle="No pending revisions right now. New tasks will show up here once they're activated."
         />
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={ListTodo} title="No matching tasks" subtitle="Try a different filter." />
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <AnimatePresence>
             {filtered.map((task, i) => (
-              <TaskCard key={task._id} task={task} index={i} onComplete={setCompletingTask} />
+              <TaskCard
+                key={task._id}
+                task={task}
+                index={i}
+                onComplete={setCompletingTask}
+                onEdit={setEditingTask}
+                onDelete={setDeletingTask}
+              />
             ))}
           </AnimatePresence>
         </div>
       )}
 
+      <EditRevisionModal
+        open={Boolean(editingTask)}
+        onClose={() => setEditingTask(null)}
+        task={editingTask}
+        existingTasks={allTasks}
+        onSave={handleSaveEdit}
+        submitting={actionLoading}
+      />
+      <DeleteConfirmModal
+        open={Boolean(deletingTask)}
+        onClose={() => setDeletingTask(null)}
+        task={deletingTask}
+        onConfirm={handleConfirmDelete}
+        loading={actionLoading}
+      />
       <CompletionModal
         open={Boolean(completingTask)}
         onClose={() => setCompletingTask(null)}
