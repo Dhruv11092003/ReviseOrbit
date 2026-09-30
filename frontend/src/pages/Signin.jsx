@@ -1,11 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Eye, EyeOff, Loader2, LogIn, Orbit } from "lucide-react";
+import { Eye, EyeOff, Loader2, LogIn } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../services/httpClient";
-import BackgroundOrbs from "../components/BackgroundOrbs";
+import AuthLayout from "../components/AuthLayout";
 
 export default function Signin() {
   const [username, setUsername] = useState("");
@@ -49,24 +48,7 @@ export default function Signin() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <BackgroundOrbs />
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-sm"
-      >
-        <div className="flex flex-col items-center mb-8">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shadow-[0_0_30px_rgba(139,108,255,0.4)] mb-4">
-            <Orbit size={24} className="text-white" strokeWidth={2.5} />
-          </div>
-          <h1 className="font-display text-2xl font-semibold">
-            Revision<span className="text-gradient">Orbit</span>
-          </h1>
-          <p className="text-sm text-[var(--color-text-dim)] mt-1">Sign in to keep your streak going</p>
-        </div>
-
+    <AuthLayout subtitle="Sign in to keep your streak going">
         <form onSubmit={handleSubmit} className="glass gradient-border rounded-2xl p-6 space-y-4">
           <div>
             <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">Username</label>
@@ -130,11 +112,10 @@ export default function Signin() {
           </Link>
         </p>
         <p className="text-center text-xs text-[var(--color-text-faint)] mt-3">
-          <Link to="/welcome" className="hover:text-[var(--color-text-dim)]">
-            Wrong workspace? Connect a different database
+          <Link to="/workspaces" className="hover:text-[var(--color-text-dim)]">
+            Wrong workspace? Switch database
           </Link>
         </p>
-      </motion.div>
-    </div>
+    </AuthLayout>
   );
 }

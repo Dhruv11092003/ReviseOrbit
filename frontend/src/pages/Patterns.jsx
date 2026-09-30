@@ -330,7 +330,7 @@ export default function Patterns() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="font-display text-2xl sm:text-3xl font-semibold flex items-center gap-2">
           <Compass size={24} className="text-violet-500" /> Patterns
@@ -376,7 +376,7 @@ export default function Patterns() {
               <h2 className="text-sm font-semibold text-[var(--color-text-dim)] mb-3 flex items-center gap-1.5">
                 <ChevronRight size={14} className="text-violet-400" /> {group.category.name}
               </h2>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {group.items.map((p) => (
                   <button
                     key={p.id}

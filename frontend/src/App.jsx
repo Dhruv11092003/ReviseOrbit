@@ -7,6 +7,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AppLayout from "./components/AppLayout";
 import Welcome from "./pages/Welcome";
 import DatabaseSetup from "./pages/DatabaseSetup";
+import SelectWorkspace from "./pages/SelectWorkspace";
 import DatabaseError from "./pages/DatabaseError";
 import Signin from "./pages/Signin";
 import Signup from "./pages/Signup";
@@ -42,7 +43,7 @@ function HomeRedirect() {
   const { hasWorkspace, isAuthenticated, initializing } = useAuth();
   if (initializing) return null;
   if (isAuthenticated) return <Navigate to="/dashboard" replace />;
-  if (hasWorkspace) return <Navigate to="/signin" replace />;
+  if (hasWorkspace) return <Navigate to="/workspaces" replace />;
   return <Navigate to="/welcome" replace />;
 }
 
@@ -81,6 +82,16 @@ function AnimatedRoutes() {
             <PageTransition>
               <DatabaseSetup />
             </PageTransition>
+          }
+        />
+        <Route
+          path="/workspaces"
+          element={
+            <RedirectIfAuthed>
+              <PageTransition>
+                <SelectWorkspace />
+              </PageTransition>
+            </RedirectIfAuthed>
           }
         />
         <Route

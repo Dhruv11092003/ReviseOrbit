@@ -22,13 +22,30 @@ const { authLimiter } = require("../middleware/rateLimit");
 
 const router = express.Router();
 
-const PASSWORD_PATTERN =
-  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[@!#$%^&*()+=])[A-Za-z\@d!#$%^&*()+=]{8,32}$/;
+// Bug fixed here: the character class used to be `[A-Za-z\@d!#$%^&*()+=]`
+// — a literal "@" and a literal letter "d", NOT the `\d` digit shorthand.
+// Since the class allowed no digit at all while the lookahead below
+// required one, NO password could ever satisfy both at once — signup was
+// unconditionally broken for every user. Also widened the allowed special
+// characters (was missing several common ones despite claiming to allow
+// "all special characters").
+const SPECIAL_CHARS = "!@#$%^&*()_+\\-=\\[\\]{};:'\",.<>/?~`|\\\\";
+const PASSWORD_PATTERN = new RegExp(
+  `^(?=.*[A-Za-z])(?=.*\\d)(?=.*[${SPECIAL_CHARS}])[A-Za-z\\d${SPECIAL_CHARS}]{8,32}$`
+);
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const COOKIE_OPTS = {
   httpOnly: true,
-  secure: process.env.NODE_ENV === "production",
-  sameSite: "lax",
+  // Cross-origin deployments (frontend and backend on different domains,
+  // the norm per docs/DEPLOYMENT.md) need SameSite=None for the browser to
+  // send the cookie back on API requests at all — SameSite=Lax cookies are
+  // withheld from cross-site fetch/XHR, which silently turned every
+  // authenticated request into a 401 right after a successful login. Lax
+  // is kept for local dev, where frontend/backend share "localhost" as
+  // their site and SameSite=None would additionally require HTTPS.
+  secure: IS_PRODUCTION,
+  sameSite: IS_PRODUCTION ? "none" : "lax",
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 

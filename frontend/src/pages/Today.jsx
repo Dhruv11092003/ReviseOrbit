@@ -103,7 +103,7 @@ export default function Today() {
   const dueTodayTasks = pendingToday.filter((t) => !isOverdue(t.nextReviseDate));
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -143,7 +143,7 @@ export default function Today() {
           {overdueTasks.length > 0 && (
             <section>
               <h2 className="text-sm font-semibold text-red-400 mb-3">Overdue</h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <AnimatePresence>
                   {overdueTasks.map((task, i) => (
                     <TaskCard
@@ -162,7 +162,7 @@ export default function Today() {
           {dueTodayTasks.length > 0 && (
             <section>
               <h2 className="text-sm font-semibold text-[var(--color-text-dim)] mb-3">Due Today</h2>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 <AnimatePresence>
                   {dueTodayTasks.map((task, i) => (
                     <TaskCard

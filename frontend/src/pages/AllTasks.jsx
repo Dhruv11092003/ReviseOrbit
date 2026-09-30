@@ -168,7 +168,7 @@ export default function AllTasks() {
   const pendingCount = tasks.filter((t) => t.isPending).length;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
         <h1 className="font-display text-2xl sm:text-3xl font-semibold flex items-center gap-2">
           <ListChecks size={24} className="text-violet-400" /> All Tasks

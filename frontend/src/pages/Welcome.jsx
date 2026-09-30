@@ -1,31 +1,15 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Database, ShieldCheck, ChevronRight, Orbit } from "lucide-react";
-import BackgroundOrbs from "../components/BackgroundOrbs";
+import { Database, ShieldCheck, ChevronRight } from "lucide-react";
+import AuthLayout from "../components/AuthLayout";
 
 export default function Welcome() {
   const [showHow, setShowHow] = useState(false);
   const navigate = useNavigate();
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <BackgroundOrbs />
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-lg"
-      >
-        <div className="flex flex-col items-center mb-8 text-center">
-          <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shadow-[0_0_30px_rgba(139,108,255,0.4)] mb-4">
-            <Orbit size={26} className="text-white" strokeWidth={2.5} />
-          </div>
-          <h1 className="font-display text-2xl sm:text-3xl font-semibold">
-            Welcome to Revise<span className="text-gradient">Orbit</span>
-          </h1>
-        </div>
-
+    <AuthLayout subtitle="Let's connect your database" wide>
         <div className="glass gradient-border rounded-2xl p-6 sm:p-8">
           <div className="flex items-start gap-3 mb-5">
             <div className="h-9 w-9 rounded-xl bg-violet-500/15 flex items-center justify-center border border-violet-500/20 shrink-0">
@@ -92,15 +76,14 @@ export default function Welcome() {
         </div>
 
         <p className="text-center text-xs text-[var(--color-text-faint)] mt-5 flex items-center justify-center gap-1">
-          Already connected a database? Continue to
+          Already connected a database? Go to
           <button
-            onClick={() => navigate("/signin")}
+            onClick={() => navigate("/workspaces")}
             className="text-violet-500 hover:text-violet-400 font-medium inline-flex items-center"
           >
-            sign in <ChevronRight size={13} />
+            your workspaces <ChevronRight size={13} />
           </button>
         </p>
-      </motion.div>
-    </div>
+    </AuthLayout>
   );
 }

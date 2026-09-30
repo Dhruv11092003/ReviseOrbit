@@ -107,7 +107,7 @@ export default function Pending() {
   const overdueCount = tasks.filter((t) => isOverdue(t.nextReviseDate)).length;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 py-8">
       <motion.div
         initial={{ opacity: 0, y: -8 }}
         animate={{ opacity: 1, y: 0 }}
@@ -174,7 +174,7 @@ export default function Pending() {
       ) : filtered.length === 0 ? (
         <EmptyState icon={ListTodo} title="No matching tasks" subtitle="Try a different filter." />
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           <AnimatePresence>
             {filtered.map((task, i) => (
               <TaskCard
