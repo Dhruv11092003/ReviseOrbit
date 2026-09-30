@@ -51,7 +51,7 @@ export default function Settings() {
       await api.disconnectDb();
       toast.success("Database disconnected.");
       forgetWorkspace();
-      navigate("/welcome");
+      navigate("/workspaces");
     } catch (err) {
       toast.error(err.message || "Failed to disconnect.");
     } finally {
@@ -61,7 +61,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-10 py-8">
       <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
         <h1 className="font-display text-2xl sm:text-3xl font-semibold flex items-center gap-2">
           <Database size={24} className="text-violet-500" /> Settings

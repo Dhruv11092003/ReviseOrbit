@@ -1,23 +1,31 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Eye, EyeOff, Loader2, UserPlus, Orbit, Check, X as XIcon } from "lucide-react";
+import { Eye, EyeOff, Loader2, UserPlus, Check, X as XIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import * as api from "../services/api";
 import { ApiError } from "../services/httpClient";
 import { useAuth } from "../context/AuthContext";
-import BackgroundOrbs from "../components/BackgroundOrbs";
+import AuthLayout from "../components/AuthLayout";
 
-// Mirrors the backend's password policy exactly:
-// /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!#$%^&*()+=])[A-Za-z\d!#$%^&*()+=]{8,32}$/
-const PASSWORD_REGEX =
-  /^(?=.*[A-Za-z])(?=.*\d)(?=.*[!#$%^&*()+=])[A-Za-z\d!#$%^&*()+=]{8,32}$/;
+// Mirrors backend/routes/auth.js's PASSWORD_PATTERN exactly — keep these in
+// sync. The previous version of this regex, and the backend's, both left
+// "@" and several other common special characters out of the allowed set
+// (and the backend copy had a separate bug: it required a digit but never
+// actually allowed one, so no password could ever pass).
+const SPECIAL_CHARS_CLASS = "!@#$%^&*()_+\\-=\\[\\]{};:'\",.<>/?~`|\\\\";
+const PASSWORD_REGEX = new RegExp(
+  `^(?=.*[A-Za-z])(?=.*\\d)(?=.*[${SPECIAL_CHARS_CLASS}])[A-Za-z\\d${SPECIAL_CHARS_CLASS}]{8,32}$`
+);
+const HAS_SPECIAL_CHAR = new RegExp(`[${SPECIAL_CHARS_CLASS}]`);
 
 const rules = [
   { test: (p) => p.length >= 8 && p.length <= 32, label: "8–32 characters" },
   { test: (p) => /[A-Za-z]/.test(p), label: "At least one letter" },
   { test: (p) => /\d/.test(p), label: "At least one number" },
-  { test: (p) => /[@!#$%^&*()+=]/.test(p), label: "One special character (@!#$%^&*()+=)" },
+  {
+    test: (p) => HAS_SPECIAL_CHAR.test(p),
+    label: "One special character (e.g. @ ! # $ % & * -)",
+  },
 ];
 
 export default function Signup() {
@@ -72,24 +80,7 @@ export default function Signup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <BackgroundOrbs />
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-sm"
-      >
-        <div className="flex flex-col items-center mb-8">
-          <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shadow-[0_0_30px_rgba(139,108,255,0.4)] mb-4">
-            <Orbit size={24} className="text-white" strokeWidth={2.5} />
-          </div>
-          <h1 className="font-display text-2xl font-semibold">
-            Revision<span className="text-gradient">Orbit</span>
-          </h1>
-          <p className="text-sm text-[var(--color-text-dim)] mt-1">Create your account</p>
-        </div>
-
+    <AuthLayout subtitle="Create your account">
         <form onSubmit={handleSubmit} className="glass gradient-border rounded-2xl p-6 space-y-4">
           <div>
             <label className="block text-xs font-medium text-[var(--color-text-dim)] mb-1.5">Name</label>
@@ -195,7 +186,6 @@ export default function Signup() {
             Sign in
           </Link>
         </p>
-      </motion.div>
-    </div>
+    </AuthLayout>
   );
 }

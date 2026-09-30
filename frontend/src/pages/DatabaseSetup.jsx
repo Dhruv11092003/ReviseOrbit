@@ -1,11 +1,10 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
 import { Database, Loader2, ShieldCheck, ExternalLink, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
 import * as api from "../services/api";
 import { useAuth } from "../context/AuthContext";
-import BackgroundOrbs from "../components/BackgroundOrbs";
+import AuthLayout from "../components/AuthLayout";
 
 const STEPS = ["Create your MongoDB", "Connect it"];
 
@@ -47,7 +46,7 @@ export default function DatabaseSetup() {
         connectionString: connectionString.trim(),
         label: label.trim(),
       });
-      setWorkspace(tenantId);
+      setWorkspace(tenantId, label.trim());
       toast.success("Database connected!");
       navigate("/signup");
     } catch (err) {
@@ -58,14 +57,7 @@ export default function DatabaseSetup() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10">
-      <BackgroundOrbs />
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-lg"
-      >
+    <AuthLayout subtitle="Connect your database" wide>
         <div className="flex items-center justify-center gap-2 mb-6">
           {STEPS.map((label, i) => (
             <div key={label} className="flex items-center gap-2">
@@ -198,7 +190,6 @@ export default function DatabaseSetup() {
             </>
           )}
         </div>
-      </motion.div>
-    </div>
+    </AuthLayout>
   );
 }

@@ -58,7 +58,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-40">
       <div className="glass border-b border-[var(--border-soft)]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-10 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 flex items-center justify-center shadow-[0_0_20px_rgba(139,108,255,0.35)]">
               <Orbit size={17} className="text-white" strokeWidth={2.5} />
