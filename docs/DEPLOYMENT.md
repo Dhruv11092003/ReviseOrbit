@@ -45,19 +45,29 @@ env vars) are the same shape on any of them.
 3. Set the **root directory** to `backend/`.
 4. Install command: `npm install`
 5. Start command: `npm start` (runs `node main.js`)
-6. Environment variables — all of these are required, and the app
-   refuses to start if any are missing:
-   - `CENTRAL_MONGODB_URI` — your own MongoDB, metadata only
-   - `JWT_SECRET` — `openssl rand -base64 48`
-   - `ENCRYPTION_KEY` — `openssl rand -base64 32`
-   - `FRONTEND_URL` — your deployed frontend's exact origin
+6. Environment variables:
+   - Required — the app refuses to start if any of these are missing:
+     - `CENTRAL_MONGODB_URI` — your own MongoDB, metadata only
+     - `JWT_SECRET` — `openssl rand -base64 48`
+     - `ENCRYPTION_KEY` — `openssl rand -base64 32`
+     - `FRONTEND_URL` — your deployed frontend's exact origin
    - `PORT` — most hosts inject this automatically; the app reads
      `process.env.PORT` and falls back to 5000 if unset
-   - `NODE_ENV=production`
+   - `NODE_ENV=production` — good practice generally, but **not** what
+     makes the session cookie work across origins: `routes/auth.js`
+     derives that from whether the actual request came in over HTTPS
+     (`req.secure`, via `X-Forwarded-Proto` — see step 8 below), not from
+     this variable. That's deliberate: several popular Node hosts don't
+     set `NODE_ENV` automatically, and a login flow that silently breaks
+     because one optional env var was never set is exactly the kind of
+     bug that's painful to track down after the fact.
 7. Health check path: `/health` (returns `{"status":"ok"}`) — configure
    this in your host's health-check settings if it supports one.
 8. HTTPS: handled by the hosting provider's edge/proxy on all three
-   options listed above; no extra app-level config needed.
+   options listed above; no extra app-level config needed —
+   `main.js` already sets `app.set("trust proxy", 1)`, so Express reads
+   the real scheme off `X-Forwarded-Proto` and `req.secure` is accurate
+   even though the Node process itself only ever speaks plain HTTP.
 9. Custom domain: optional, configure in the host's dashboard the same
    way as the frontend.
 
